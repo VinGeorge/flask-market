@@ -50,7 +50,7 @@ class Category(db.Model):
     __tablename__ = 'categories'
 
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String, nullable=False)
+    title = db.Column(db.String, nullable=False, unique=True)
     dish = db.relationship('Dish')
 
 
@@ -105,7 +105,11 @@ def import_dishes():
 @app.route('/')
 def main():
 
-    return render_template('main.html')
+    categories = [category for category in Category.query.all()]
+    dishes = [dish for dish in Dish.query.all()]
+
+
+    return render_template('main.html', dishes=dishes, categories=categories)
 
 
 @app.route('/cart/')
@@ -148,5 +152,8 @@ def ordered():
 if __name__ == '__main__':
     # import_categories()
     # import_dishes()
-    # print(Category.query.all())
+    # print(Dish.query.count())
+    # Dish.query.delete()
+    # Category.query.delete()
+    # db.session.commit()
     app.run(debug=True)
