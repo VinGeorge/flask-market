@@ -148,5 +148,5 @@ def ordered():
 if __name__ == '__main__':
     # import_categories()
     # import_dishes()
-    print(Category.query.all())
-    # app.run()
+    # print(Category.query.all())
+    app.run(debug=True)
