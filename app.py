@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import flask_sqlalchemy
 import flask_migrate
+import csv
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -39,7 +40,8 @@ class Dish(db.Model):
     description = db.Column(db.String, nullable=False)
     picture = db.Column(db.String, nullable=False)
     category = db.relationship('Category')
-    order = db.relationship('Order',
+    category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
+    orders = db.relationship('Order',
                             secondary=orders_asso,
                             back_populates='dishes')
 
@@ -65,6 +67,39 @@ class Order(db.Model):
     dishes = db.relationship('Dish',
                             secondary=orders_asso,
                             back_populates='orders')
+    user = db.relationship('User')
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+
+categories_file = 'data/delivery_categories.csv'
+dishes_file = 'data/delivery_items.csv'
+
+
+def import_categories():
+
+    with open(categories_file, 'r') as f:
+        categories = csv.DictReader(f, delimiter=',')
+        for category in categories:
+            db.session.add(Category(
+                title=category['title']
+            ))
+
+    db.session.commit()
+
+
+def import_dishes():
+
+    with open(dishes_file, 'r') as f:
+        dishes = csv.DictReader(f, delimiter=',')
+        for dish in dishes:
+            db.session.add(Dish(
+                title=dish['title'],
+                price=dish['price'],
+                description=dish['description'],
+                picture=dish['picture'],
+                category_id=dish['category_id']
+            ))
+    db.session.commit()
 
 
 @app.route('/')
@@ -111,5 +146,7 @@ def ordered():
 
 
 if __name__ == '__main__':
-
-    app.run()
+    # import_categories()
+    # import_dishes()
+    print(Category.query.all())
+    # app.run()
