@@ -1,9 +1,12 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import flask_sqlalchemy
 import flask_migrate
 import csv
+from flask_wtf import FlaskForm
+from wtforms import StringField, HiddenField, RadioField, PasswordField
+from wtforms.validators import InputRequired, Email
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -20,7 +23,6 @@ orders_asso = db.Table('orders_asso',
                       db.Column('order_id', db.Integer, db.ForeignKey('orders.id')),
                       db.Column('dish_id', db.Integer, db.ForeignKey('dishes.id'))
                       )
-
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -102,20 +104,51 @@ def import_dishes():
     db.session.commit()
 
 
+class RegistrationForm(FlaskForm):
+
+    usermail = StringField("Электропочта", [Email(message="Кажется это не почта. Попробуйте еще раз!"), InputRequired()])
+    password = PasswordField("Пароль", [InputRequired(message="Введите пароль. Без него сейчас никак")])
+
+
+class OrderForm(FlaskForm):
+
+    usermail = StringField("Электропочта", [Email(message="Кажется это не почта. Попробуйте еще раз!"), InputRequired()])
+    name = StringField("Ваше имя", [InputRequired()])
+    adress = StringField("Адрес", [InputRequired()])
+    phone = StringField("Телефон", [InputRequired()])
+
+
+def define_cart_items(cart=False):
+
+    cart_items = session.get("cart", [])
+    dishes_in_cart = [dish for dish in Dish.query.filter(Dish.id.in_(cart_items)).all()]
+    total_price = sum([dish.price for dish in dishes_in_cart])
+    total_count = len(dishes_in_cart)
+
+    if cart:
+        return total_price, total_count, dishes_in_cart
+
+    return total_price, total_count
+
+
 @app.route('/')
 def main():
+
+    total_price, total_count = define_cart_items()
 
     categories = [category for category in Category.query.all()]
     dishes = [dish for dish in Dish.query.all()]
 
+    return render_template('main.html', dishes=dishes, categories=categories, total_price=total_price, total_count=total_count)
 
-    return render_template('main.html', dishes=dishes, categories=categories)
 
-
-@app.route('/cart/')
+@app.route('/cart/', methods=["GET", "POST"])
 def cart():
 
-    return render_template('cart.html')
+    total_price, total_count, dishes = define_cart_items(cart=True)
+    form = OrderForm()
+
+    return render_template('cart.html', dishes=dishes, total_count=total_count, total_price=total_price, form=form)
 
 
 @app.route('/account/')
@@ -124,20 +157,106 @@ def account():
     return render_template('account.html')
 
 
-@app.route('/login/')
+@app.route('/login/', methods=["GET", "POST"])
 def login():
 
-    return render_template('login.html')
+    error_msg = ""
+
+    form = RegistrationForm()
+
+    if request.method == "POST":
+
+        usermail = request.form.get("usermail")
+        password = request.form.get("password")
+        user = User.query.filter_by(mail=usermail).first()
+
+        if not usermail or not password:
+            error_msg = "Не указано имя или пароль"
+            return render_template("login.html", form=form, error_msg=error_msg)
+
+        if user is False:
+            error_msg = "Пользователь с такой почтой не найден"
+            return render_template("login.html", form=form, error_msg=error_msg)
+
+        if user.password != password:
+            error_msg = "Неправильно указана почта или пароль"
+            return render_template("login.html", form=form, error_msg=error_msg)
+
+        session['id'] = user.id
+        session['mail'] = user.mail
+
+        return render_template("main.html", form=form, error_msg=error_msg)
+
+    return render_template('login.html', form=form)
 
 
-@app.route('/register/')
+@app.route('/register/', methods=["GET", "POST"])
 def register():
 
-    return render_template('register.html')
+    # if session.get("user_id"): #разобраться вот с этим редиректом
+    #     return redirect("/")
+
+    error_msg = ""
+
+    form = RegistrationForm()
+
+    if request.method == "POST":
+
+        usermail = request.form.get("usermail")
+        password = request.form.get("password")
+        user = User.query.filter_by(mail=usermail).first()
+
+        if not usermail or not password:
+
+            error_msg = "Не указано имя или пароль"
+            return render_template("register.html", form=form, error_msg=error_msg)
+
+        if user:
+            error_msg = "Пользователь с такой почтой уже существует"
+            return render_template("register.html", form=form, error_msg=error_msg)
+
+
+        db.session.add(User(
+            mail=usermail,
+            password=password
+        ))
+        db.session.commit()
+
+        return f'Спасибо за регистрацию!'
+
+    return render_template("register.html", form=form, error_msg=error_msg)
+
+
+@app.route('/addtocart/<int:dish_id>', methods=["GET"])
+def add_to_cart(dish_id):
+
+    cart = session.get("cart", [])
+    cart.append(dish_id)
+    session['cart'] = cart
+
+    if session.get("cart"):
+        return redirect("/cart/")
+
+
+@app.route('/removefromcart/<int:dish_id>', methods=["GET"])
+def remove_from_cart(dish_id):
+
+    cart = session.get("cart", [])
+    cart.remove(dish_id)
+    session['cart'] = cart
+
+    if len(cart) == 0:
+        return redirect("/")
+
+    if session.get("cart"):
+        return redirect("/cart/")
 
 
 @app.route('/logout/')
 def logout():
+
+    session.pop('id')
+    session.pop('mail')
 
     return render_template('main.html')
 
@@ -156,4 +275,5 @@ if __name__ == '__main__':
     # Dish.query.delete()
     # Category.query.delete()
     # db.session.commit()
+    # print(User.query.count())
     app.run(debug=True)
