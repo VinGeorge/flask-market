@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, redirect
+from flask import Flask, render_template, request, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import flask_sqlalchemy
@@ -60,9 +60,7 @@ class Order(db.Model):
     __tablename__ = 'orders'
 
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False)
     order_sum = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String, nullable=False)
     mail = db.Column(db.String, nullable=False)
     phone = db.Column(db.String, nullable=False)
     adress = db.Column(db.String, nullable=False)
@@ -116,6 +114,8 @@ class OrderForm(FlaskForm):
     name = StringField("Ваше имя", [InputRequired()])
     adress = StringField("Адрес", [InputRequired()])
     phone = StringField("Телефон", [InputRequired()])
+    userOrder = HiddenField("userOrder")
+    orderSum = HiddenField("orderSum")
 
 
 def define_cart_items(cart=False):
@@ -138,15 +138,24 @@ def main():
 
     categories = [category for category in Category.query.all()]
     dishes = [dish for dish in Dish.query.all()]
+    user_id = session['id']
+    login_status = False
 
-    return render_template('main.html', dishes=dishes, categories=categories, total_price=total_price, total_count=total_count)
+    if User.query.filter_by(id=user_id).first():
+        login_status = True
+
+    url_for(endpoint='main', login_status=login_status)
+
+    return render_template('main.html', dishes=dishes, categories=categories, total_price=total_price,
+                           total_count=total_count)
 
 
 @app.route('/cart/', methods=["GET", "POST"])
 def cart():
 
     total_price, total_count, dishes = define_cart_items(cart=True)
-    form = OrderForm()
+    dishes_id = [dish.id for dish in dishes]
+    form = OrderForm(userOrder=dishes_id, orderSum=total_price)
 
     return render_template('cart.html', dishes=dishes, total_count=total_count, total_price=total_price, form=form)
 
@@ -184,17 +193,14 @@ def login():
 
         session['id'] = user.id
         session['mail'] = user.mail
-
-        return render_template("main.html", form=form, error_msg=error_msg)
+        login_status = True
+        return redirect(url_for(endpoint='main', login_status=login_status))
 
     return render_template('login.html', form=form)
 
 
 @app.route('/register/', methods=["GET", "POST"])
 def register():
-
-    # if session.get("user_id"): #разобраться вот с этим редиректом
-    #     return redirect("/")
 
     error_msg = ""
 
@@ -235,6 +241,13 @@ def add_to_cart(dish_id):
     session['cart'] = cart
 
     if session.get("cart"):
+
+        user_id = session['id']
+        if User.query.filter_by(id=user_id).first():
+            login_status = True
+
+            return redirect(url_for(endpoint='cart', login_status=login_status))
+
         return redirect("/cart/")
 
 
@@ -246,10 +259,19 @@ def remove_from_cart(dish_id):
     session['cart'] = cart
 
     if len(cart) == 0:
+
         return redirect("/")
 
     if session.get("cart"):
-        return redirect("/cart/")
+
+        user_id = session['id']
+        if User.query.filter_by(id=user_id).first():
+            login_status = True
+            remove_status = True
+            return redirect(url_for(endpoint='cart', login_status=login_status, remove_status=remove_status))
+
+        remove_status = True
+        return redirect(url_for(endpoint='cart', remove_status=remove_status))
 
 
 @app.route('/logout/')
@@ -261,8 +283,25 @@ def logout():
     return render_template('main.html')
 
 
-@app.route('/ordered/')
+@app.route('/ordered/', methods=["POST", "GET"])
 def ordered():
+
+    if request.method == 'POST':
+        form = OrderForm()
+
+        usermail = form.usermail.data
+        name = form.name.data
+        adress = form.adress.data
+        phone = form.phone.data
+        userOrder = form.userOrder.data
+        orderSum = form.orderSum.data
+
+        new_order = Order(
+            usermail=usermail,
+            name=name,
+            adress=adress,
+            phone=phone,
+            orderSum=orderSum,)
 
     return render_template('ordered.html')
 
