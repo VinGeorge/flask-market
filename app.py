@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 import flask_sqlalchemy
 import flask_migrate
 import csv
+from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import StringField, HiddenField, RadioField, PasswordField
 from wtforms.validators import InputRequired, Email
@@ -44,8 +45,8 @@ class Dish(db.Model):
     category = db.relationship('Category')
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
     orders = db.relationship('Order',
-                            secondary=orders_asso,
-                            back_populates='dishes')
+                             secondary=orders_asso,
+                             back_populates='dishes')
 
 
 class Category(db.Model):
@@ -63,10 +64,11 @@ class Order(db.Model):
     order_sum = db.Column(db.Float, nullable=False)
     mail = db.Column(db.String, nullable=False)
     phone = db.Column(db.String, nullable=False)
+    order_date = db.Column(db.Date, nullable=False)
     adress = db.Column(db.String, nullable=False)
     dishes = db.relationship('Dish',
-                            secondary=orders_asso,
-                            back_populates='orders')
+                             secondary=orders_asso,
+                             back_populates='orders')
     user = db.relationship('User')
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
@@ -115,7 +117,7 @@ class OrderForm(FlaskForm):
     adress = StringField("Адрес", [InputRequired()])
     phone = StringField("Телефон", [InputRequired()])
     userOrder = HiddenField("userOrder")
-    orderSum = HiddenField("orderSum")
+    order_sum = HiddenField("orderSum")
 
 
 def define_cart_items(cart=False):
@@ -155,12 +157,12 @@ def cart():
 
     total_price, total_count, dishes = define_cart_items(cart=True)
     dishes_id = [dish.id for dish in dishes]
-    form = OrderForm(userOrder=dishes_id, orderSum=total_price)
+    form = OrderForm(userOrder=dishes_id, order_sum=total_price)
 
     return render_template('cart.html', dishes=dishes, total_count=total_count, total_price=total_price, form=form)
 
 
-@app.route('/account/')
+@app.route('/account/', methods=["GET"])
 def account():
 
     return render_template('account.html')
@@ -220,7 +222,6 @@ def register():
         if user:
             error_msg = "Пользователь с такой почтой уже существует"
             return render_template("register.html", form=form, error_msg=error_msg)
-
 
         db.session.add(User(
             mail=usermail,
@@ -286,22 +287,48 @@ def logout():
 @app.route('/ordered/', methods=["POST", "GET"])
 def ordered():
 
-    if request.method == 'POST':
-        form = OrderForm()
+    form = OrderForm()
 
-        usermail = form.usermail.data
+    if request.method == 'POST':
+
+        mail = form.usermail.data
         name = form.name.data
         adress = form.adress.data
         phone = form.phone.data
-        userOrder = form.userOrder.data
-        orderSum = form.orderSum.data
+        userOrder = form.userOrder.data[1:-1].split(',')
+        orderSum = form.order_sum.data
+        orderDate = date.today()
 
-        new_order = Order(
-            usermail=usermail,
-            name=name,
-            adress=adress,
-            phone=phone,
-            orderSum=orderSum,)
+        user_id = session['id']
+        user = User.query.filter_by(id=user_id).first()
+
+        if user:
+            new_order = Order(
+                mail=mail,
+                adress=adress,
+                phone=phone,
+                order_sum=orderSum,
+                order_date=orderDate,
+                user=user)
+
+            db.session.add(new_order)
+
+        else:
+            new_order = Order(
+                mail=mail,
+                adress=adress,
+                phone=phone,
+                order_sum=orderSum,
+                order_date=orderDate)
+
+            db.session.add(new_order)
+
+
+        for dish_id in userOrder:
+            dish = Dish.query.filter_by(id=dish_id).first()
+            dish.orders.append(new_order)
+
+        db.session.commit()
 
     return render_template('ordered.html')
 
