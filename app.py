@@ -1,18 +1,15 @@
-from flask import Flask, render_template, request, session, redirect, url_for
-import flask_sqlalchemy
-import flask_migrate
 import csv
 from datetime import date
-from flask_wtf import FlaskForm
-from wtforms import StringField, HiddenField, PasswordField
-from wtforms.validators import InputRequired, Email, Length
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, render_template, request, session, redirect, url_for
+import flask_migrate
+import flask_sqlalchemy
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
+from flask_wtf import FlaskForm
+from werkzeug.security import generate_password_hash, check_password_hash
+from wtforms import StringField, HiddenField, PasswordField
+from wtforms.validators import InputRequired, Email, Length
 
-
-app = Flask(__name__)
-app.config["DEBUG"] = True
 app = Flask(__name__)  # объявим экземпляр фласка
 app.secret_key = "randomstring"
 
@@ -157,22 +154,24 @@ def define_cart_items(cart=False):
 
     return total_price, total_count
 
+from site.main import bp as main_bp
+app.register_blueprint(main_bp, url_prefix='/site')
 
-@app.route('/')
-def main():
-
-    total_price, total_count = define_cart_items()
-    categories = [category for category in Category.query.all()]
-    dishes = [dish for dish in Dish.query.all()]
-
-    try:
-        session['id']
-        login_status = True
-    except KeyError:
-        login_status = False
-
-    return render_template('main.html', dishes=dishes, categories=categories, total_price=total_price,
-                           total_count=total_count, login_status=login_status)
+# @app.route('/')
+# def main():
+#
+#     total_price, total_count = define_cart_items()
+#     categories = [category for category in Category.query.all()]
+#     dishes = [dish for dish in Dish.query.all()]
+#
+#     try:
+#         session['id']
+#         login_status = True
+#     except KeyError:
+#         login_status = False
+#
+#     return render_template('main.html', dishes=dishes, categories=categories, total_price=total_price,
+#                            total_count=total_count, login_status=login_status)
 
 
 @app.route('/cart/', methods=["GET", "POST"])
@@ -216,8 +215,6 @@ def account():
 
 @app.route('/login/', methods=["GET", "POST"])
 def login():
-
-    error_msg = ""
 
     form = RegistrationForm()
 
