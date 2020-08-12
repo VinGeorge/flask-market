@@ -1,12 +1,10 @@
 from flask import Flask, render_template, request, session, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 import flask_sqlalchemy
 import flask_migrate
 import csv
 from datetime import date
 from flask_wtf import FlaskForm
-from wtforms import StringField, HiddenField, RadioField, PasswordField
+from wtforms import StringField, HiddenField, PasswordField
 from wtforms.validators import InputRequired, Email
 
 app = Flask(__name__)
@@ -137,19 +135,17 @@ def define_cart_items(cart=False):
 def main():
 
     total_price, total_count = define_cart_items()
-
     categories = [category for category in Category.query.all()]
     dishes = [dish for dish in Dish.query.all()]
-    user_id = session['id']
-    login_status = False
 
-    if User.query.filter_by(id=user_id).first():
+    try:
+        session['id']
         login_status = True
-
-    url_for(endpoint='main', login_status=login_status)
+    except KeyError:
+        login_status = False
 
     return render_template('main.html', dishes=dishes, categories=categories, total_price=total_price,
-                           total_count=total_count)
+                           total_count=total_count, login_status=login_status)
 
 
 @app.route('/cart/', methods=["GET", "POST"])
@@ -159,13 +155,37 @@ def cart():
     dishes_id = [dish.id for dish in dishes]
     form = OrderForm(userOrder=dishes_id, order_sum=total_price)
 
-    return render_template('cart.html', dishes=dishes, total_count=total_count, total_price=total_price, form=form)
+    try:
+        session['id']
+        login_status = True
+    except KeyError:
+        login_status = False
+
+    return render_template('cart.html', dishes=dishes, total_count=total_count, total_price=total_price,
+                           login_status=login_status, form=form)
 
 
 @app.route('/account/', methods=["GET"])
 def account():
 
-    return render_template('account.html')
+    try:
+
+        user_dishes = db.session.query(Order.id, Order.order_date, Order.order_sum, Dish.title, Dish.price) \
+            .select_from(Order).join(orders_asso).join(Dish).join(User).filter(User.id == session['id']).all()
+
+        total_price, total_count = define_cart_items()
+
+        user_orders = db.session.query(Order.id, Order.order_date, Order.order_sum).select_from(Order) \
+            .join(User).filter(User.id == session['id']).all()
+
+        login_status = True
+
+        return render_template('account.html', total_price=total_price, total_count=total_count,
+                               user_orders=user_orders, user_dishes=user_dishes, login_status=login_status)
+
+    except KeyError:
+        return f"Только зарегистрированным пользователям доступен личный кабинет"
+
 
 
 @app.route('/login/', methods=["GET", "POST"])
@@ -195,8 +215,7 @@ def login():
 
         session['id'] = user.id
         session['mail'] = user.mail
-        login_status = True
-        return redirect(url_for(endpoint='main', login_status=login_status))
+        return redirect('/')
 
     return render_template('login.html', form=form)
 
@@ -241,15 +260,7 @@ def add_to_cart(dish_id):
     cart.append(dish_id)
     session['cart'] = cart
 
-    if session.get("cart"):
-
-        user_id = session['id']
-        if User.query.filter_by(id=user_id).first():
-            login_status = True
-
-            return redirect(url_for(endpoint='cart', login_status=login_status))
-
-        return redirect("/cart/")
+    return redirect("/cart/")
 
 
 @app.route('/removefromcart/<int:dish_id>', methods=["GET"])
@@ -264,15 +275,9 @@ def remove_from_cart(dish_id):
         return redirect("/")
 
     if session.get("cart"):
-
-        user_id = session['id']
-        if User.query.filter_by(id=user_id).first():
-            login_status = True
-            remove_status = True
-            return redirect(url_for(endpoint='cart', login_status=login_status, remove_status=remove_status))
-
         remove_status = True
-        return redirect(url_for(endpoint='cart', remove_status=remove_status))
+
+    return redirect(url_for(endpoint='cart', remove_status=remove_status))
 
 
 @app.route('/logout/')
@@ -281,7 +286,7 @@ def logout():
     session.pop('id')
     session.pop('mail')
 
-    return render_template('main.html')
+    return redirect('/')
 
 
 @app.route('/ordered/', methods=["POST", "GET"])
@@ -292,10 +297,8 @@ def ordered():
     if request.method == 'POST':
 
         mail = form.usermail.data
-        name = form.name.data
         adress = form.adress.data
         phone = form.phone.data
-        userOrder = form.userOrder.data[1:-1].split(',')
         orderSum = form.order_sum.data
         orderDate = date.today()
 
@@ -323,8 +326,7 @@ def ordered():
 
             db.session.add(new_order)
 
-
-        for dish_id in userOrder:
+        for dish_id in session['cart']:
             dish = Dish.query.filter_by(id=dish_id).first()
             dish.orders.append(new_order)
 
@@ -335,11 +337,4 @@ def ordered():
 
 
 if __name__ == '__main__':
-    # import_categories()
-    # import_dishes()
-    # print(Dish.query.count())
-    # Dish.query.delete()
-    # Category.query.delete()
-    # db.session.commit()
-    # print(User.query.count())
     app.run(debug=True)

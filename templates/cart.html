@@ -15,7 +15,7 @@
     <div class="alert alert-warning" role="alert">Блюдо было удалено из корзины</div>
     {% endif %}
 
-    {% if request.args.get('login_status') != 'True' %}
+    {% if login_status == False %}
     <div class="alert alert-warning" role="alert">Чтобы сделать заказ – <a href="/login/">войдите</a> или <a href="/register/">зарегистрируйтесь</a></div>
     {% endif %}
 
