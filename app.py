@@ -6,6 +6,7 @@ from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import StringField, HiddenField, PasswordField
 from wtforms.validators import InputRequired, Email
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -28,8 +29,23 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     mail = db.Column(db.String, nullable=False, unique=True)
-    password = db.Column(db.String, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
     orders = db.relationship('Order')
+
+    @property
+    def password(self):
+        # Запретим прямое обращение к паролю
+        raise AttributeError("Вам не нужно знать пароль!")
+
+    @password.setter
+    def password(self, password):
+        # Устанавливаем пароль через этот метод
+        self.password_hash = generate_password_hash(password)
+
+    def password_valid(self, password):
+        # Проверяем пароль через этот метод
+        # Функция check_password_hash превращает password в хеш и сравнивает с хранимым
+        return check_password_hash(self.password_hash, password)
 
 
 class Dish(db.Model):
@@ -209,13 +225,14 @@ def login():
             error_msg = "Пользователь с такой почтой не найден"
             return render_template("login.html", form=form, error_msg=error_msg)
 
-        if user.password != password:
+        if user.password_valid(password):
+            session['id'] = user.id
+            session['mail'] = user.mail
+            return redirect('/')
+        else:
+
             error_msg = "Неправильно указана почта или пароль"
             return render_template("login.html", form=form, error_msg=error_msg)
-
-        session['id'] = user.id
-        session['mail'] = user.mail
-        return redirect('/')
 
     return render_template('login.html', form=form)
 
@@ -244,7 +261,7 @@ def register():
 
         db.session.add(User(
             mail=usermail,
-            password=password
+            password_hash=password
         ))
         db.session.commit()
 
