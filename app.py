@@ -5,8 +5,11 @@ import csv
 from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import StringField, HiddenField, PasswordField
-from wtforms.validators import InputRequired, Email
+from wtforms.validators import InputRequired, Email, Length
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
+
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -86,6 +89,12 @@ class Order(db.Model):
     user = db.relationship('User')
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
+admin = Admin(app)
+admin.add_view(ModelView(User, db.session))
+admin.add_view(ModelView(Order, db.session))
+admin.add_view(ModelView(Category, db.session))
+admin.add_view(ModelView(Dish, db.session))
+
 
 categories_file = 'data/delivery_categories.csv'
 dishes_file = 'data/delivery_items.csv'
@@ -120,13 +129,15 @@ def import_dishes():
 
 class RegistrationForm(FlaskForm):
 
-    usermail = StringField("Электропочта", [Email(message="Кажется это не почта. Попробуйте еще раз!"), InputRequired()])
+    usermail = StringField("Электропочта", [Email(message="Кажется это не почта. Попробуйте еще раз!"),
+                                            InputRequired()])
     password = PasswordField("Пароль", [InputRequired(message="Введите пароль. Без него сейчас никак")])
 
 
 class OrderForm(FlaskForm):
 
-    usermail = StringField("Электропочта", [Email(message="Кажется это не почта. Попробуйте еще раз!"), InputRequired()])
+    usermail = StringField("Электропочта", [Email(message="Кажется это не почта. Попробуйте еще раз!"),
+                                            InputRequired(), Length(5)])
     name = StringField("Ваше имя", [InputRequired()])
     adress = StringField("Адрес", [InputRequired()])
     phone = StringField("Телефон", [InputRequired()])
@@ -203,7 +214,6 @@ def account():
         return f"Только зарегистрированным пользователям доступен личный кабинет"
 
 
-
 @app.route('/login/', methods=["GET", "POST"])
 def login():
 
@@ -228,7 +238,7 @@ def login():
         if user.password_valid(password):
             session['id'] = user.id
             session['mail'] = user.mail
-            return redirect('/')
+            return redirect('/account/')
         else:
 
             error_msg = "Неправильно указана почта или пароль"
@@ -350,7 +360,6 @@ def ordered():
         db.session.commit()
 
     return render_template('ordered.html')
-
 
 
 if __name__ == '__main__':
