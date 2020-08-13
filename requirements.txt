@@ -3,6 +3,7 @@ alembic-migrate==2.5.9.dev0
 appdirs==1.4.4
 bael.project==0.2.7
 baelfire==0.5.1
+boto==2.49.0
 click==7.1.2
 distlib==0.3.1
 dnspython==2.0.0
