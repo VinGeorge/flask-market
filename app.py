@@ -11,13 +11,12 @@ from market_views.login import bp as login_bp
 from market_views.register import bp as register_bp
 from market_views.logout import bp as logout_bp
 from market_views.ordered import bp as order_bp
-from boto.s3.connection import S3Connection
+
 
 app = Flask(__name__)  # объявим экземпляр фласка
-# app.secret_key = os.environ['SECRET_KEY']
-# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ("DATABASE_URL")
+app.secret_key = os.getenv('SECRET_KEY')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-s3 = S3Connection(os.environ['SECRET_KEY'], os.environ["DATABASE_URL"])
 db.init_app(app)
 migrate = flask_migrate.Migrate(app, db)
 
