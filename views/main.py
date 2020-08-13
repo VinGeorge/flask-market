@@ -1,4 +1,6 @@
 from flask import render_template, session, Blueprint
+from cart_func import define_cart_items
+from models import Dish, Category
 
 
 bp = Blueprint("main", __name__)
