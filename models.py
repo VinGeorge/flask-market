@@ -4,19 +4,14 @@ import flask_sqlalchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-app = Flask(__name__)  # объявим экземпляр фласка
-app.secret_key = "randomstring"
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://stmafswldqtivy:1fa95bb194a917926b3a0343a4b6157c15c67f3457cf08bf1df63601d01bd463@ec2-54-197-254-117.compute-1.amazonaws.com:5432/d18md6kmp2cikr'
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = flask_sqlalchemy.SQLAlchemy(app)
-migrate = flask_migrate.Migrate(app, db)
+db = flask_sqlalchemy.SQLAlchemy()
 
 
 orders_asso = db.Table('orders_asso',
                       db.Column('order_id', db.Integer, db.ForeignKey('orders.id')),
                       db.Column('dish_id', db.Integer, db.ForeignKey('dishes.id'))
                       )
+
 
 class User(db.Model):
     __tablename__ = 'users'

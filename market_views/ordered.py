@@ -6,7 +6,6 @@ from models import User, Order, Dish, User, db
 bp = Blueprint("ordered", __name__)
 
 
-
 @bp.route('/ordered/', methods=["POST", "GET"])
 def ordered():
 
